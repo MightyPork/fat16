@@ -22,10 +22,10 @@ uint32_t clu_addr(const FAT16* fat, const uint16_t cluster);
 uint16_t next_clu(const FAT16* fat, uint16_t cluster);
 
 /** Find relative address in a file, using FAT for cluster lookup */
-uint32_t clu_add(const FAT16* fat, uint16_t cluster, uint32_t addr);
+uint32_t clu_offs(const FAT16* fat, uint16_t cluster, uint32_t addr);
 
 /** Read a file entry from directory (dir starting cluster, entry number) */
-void fat16_fopen(const FAT16* fat, FAT16_FILE* file, const uint16_t dir_cluster, const uint16_t num);
+void open_file(const FAT16* fat, FAT16_FILE* file, const uint16_t dir_cluster, const uint16_t num);
 
 /** Allocate and chain new cluster to a chain starting at given cluster */
 bool append_cluster(const FAT16* fat, const uint16_t clu);
@@ -161,7 +161,7 @@ uint16_t next_clu(const FAT16* fat, uint16_t cluster)
 
 
 /** Find file-relative address in fat table */
-uint32_t clu_add(const FAT16* fat, uint16_t cluster, uint32_t addr)
+uint32_t clu_offs(const FAT16* fat, uint16_t cluster, uint32_t addr)
 {
 	while (addr >= fat->bs.bytes_per_cluster)
 	{
@@ -277,6 +277,88 @@ bool dir_contains_file_raw(FAT16_FILE* dir, char* fname)
 }
 
 
+/**
+ * Read a file entry
+ *
+ * dir_cluster ... directory start cluster
+ * num ... entry number in the directory
+ */
+void open_file(const FAT16* fat, FAT16_FILE* file, const uint16_t dir_cluster, const uint16_t num)
+{
+	// Resolve starting address
+	uint32_t addr;
+	if (dir_cluster == 0)
+	{
+		addr = clu_addr(fat, dir_cluster) + num * 32; // root directory, max 512 entries.
+	} else
+	{
+		addr = clu_offs(fat, dir_cluster, num * 32); // cluster + N (wrapping to next cluster if needed)
+	}
+
+	fat->dev->seek(addr);
+	fat->dev->load(file, 12); // name, ext, attribs
+	fat->dev->rseek(14); // skip 14 bytes
+	fat->dev->load(((void*)file) + 12, 6); // read remaining bytes
+
+	file->clu = dir_cluster;
+	file->num = num;
+
+	// Resolve filename & type
+
+	file->type = FT_FILE;
+
+	switch(file->name[0])
+	{
+		case 0x00:
+			file->type = FT_NONE;
+			return;
+
+		case 0xE5:
+			file->type = FT_DELETED;
+			return;
+
+		case 0x05: // Starting with 0xE5
+			file->type = FT_FILE;
+			file->name[0] = 0xE5; // convert to the real character
+			break;
+
+		case 0x2E:
+			if (file->name[1] == 0x2E)
+			{
+				// ".." directory
+				file->type = FT_PARENT;
+			} else
+			{
+				// "." directory
+				file->type = FT_SELF;
+			}
+			break;
+
+		default:
+			file->type = FT_FILE;
+	}
+
+	// handle subdir, label
+	if (file->attribs & FA_DIR && file->type == FT_FILE)
+	{
+		file->type = FT_SUBDIR;
+	}
+	else if (file->attribs == FA_LABEL)
+	{
+		file->type = FT_LABEL; // volume label special file
+	}
+	else if (file->attribs == 0x0F)
+	{
+		file->type = FT_LFN; // long name special file, can be safely ignored
+	}
+
+	// add a FAT pointer
+	file->fat = fat;
+
+	// Init cursors
+	fat16_fseek(file, 0);
+}
+
 
 // =============== PUBLIC FUNCTION IMPLEMENTATIONS =================
 
@@ -337,89 +419,6 @@ bool fat16_fseek(FAT16_FILE* file, uint32_t addr)
 	file->fat->dev->seek(file->cur_abs);
 
 	return true;
-}
-
-
-/**
- * Read a file entry
- *
- * dir_cluster ... directory start cluster
- * num ... entry number in the directory
- */
-void fat16_fopen(const FAT16* fat, FAT16_FILE* file, const uint16_t dir_cluster, const uint16_t num)
-{
-	// Resolve starting address
-	uint32_t addr;
-	if (dir_cluster == 0)
-	{
-		addr = clu_addr(fat, dir_cluster) + num * 32; // root directory, max 512 entries.
-	} else
-	{
-		addr = clu_add(fat, dir_cluster, num * 32); // cluster + N (wrapping to next cluster if needed)
-	}
-
-	fat->dev->seek(addr);
-	fat->dev->load(file, 12); // name, ext, attribs
-	fat->dev->rseek(14); // skip 14 bytes
-	fat->dev->load(((void*)file) + 12, 6); // read remaining bytes
-
-	file->clu = dir_cluster;
-	file->num = num;
-
-	// Resolve filename & type
-
-	file->type = FT_FILE;
-
-	switch(file->name[0])
-	{
-		case 0x00:
-			file->type = FT_NONE;
-			return;
-
-		case 0xE5:
-			file->type = FT_DELETED;
-			return;
-
-		case 0x05: // Starting with 0xE5
-			file->type = FT_FILE;
-			file->name[0] = 0xE5; // convert to the real character
-			break;
-
-		case 0x2E:
-			if (file->name[1] == 0x2E)
-			{
-				// ".." directory
-				file->type = FT_PARENT;
-			} else
-			{
-				// "." directory
-				file->type = FT_SELF;
-			}
-			break;
-
-		default:
-			file->type = FT_FILE;
-	}
-
-	// handle subdir, label
-	if (file->attribs & FA_DIR && file->type == FT_FILE)
-	{
-		file->type = FT_SUBDIR;
-	} else
-	if (file->attribs == FA_LABEL)
-	{
-		file->type = FT_LABEL; // volume label special file
-	} else
-	if (file->attribs == 0x0F)
-	{
-		file->type = FT_LFN; // long name special file, can be safely ignored
-	}
-
-	// add a FAT pointer
-	file->fat = fat;
-
-	// Init cursors
-	fat16_fseek(file, 0);
 }
 
 
@@ -598,7 +597,7 @@ bool fat16_next(FAT16_FILE* file)
 	if (file->clu == 0 && file->num >= fat->bs.root_entries)
 		return false; // attempt to read outside root directory.
 
-	uint32_t addr = clu_add(fat, file->clu, (file->num + 1) * 32);
+	uint32_t addr = clu_offs(fat, file->clu, (file->num + 1) * 32);
 	if (addr == 0xFFFF)
 		return false; // next file is out of the directory cluster
 
@@ -611,7 +610,7 @@ bool fat16_next(FAT16_FILE* file)
 	if (x == 0)
 		return false;
 
-	fat16_fopen(fat, file, file->clu, file->num+1);
+	open_file(fat, file, file->clu, file->num+1);
 
 	return true;
 }
@@ -623,7 +622,7 @@ bool fat16_prev(FAT16_FILE* file)
 	if (file->num == 0)
 		return false; // first file already
 
-	fat16_fopen(file->fat, file, file->clu, file->num-1);
+	open_file(file->fat, file, file->clu, file->num-1);
 
 /*	// Skip bad files
 	if (!fat16_is_file_valid(file))
@@ -636,7 +635,7 @@ bool fat16_prev(FAT16_FILE* file)
 /** Rewind to first file in directory */
 void fat16_first(FAT16_FILE* file)
 {
-	fat16_fopen(file->fat, file, file->clu, 0);
+	open_file(file->fat, file, file->clu, 0);
 }
 
 
@@ -647,14 +646,14 @@ bool fat16_opendir(FAT16_FILE* file)
 	if (!(file->attribs & FA_DIR) || file->type == FT_SELF)
 		return false;
 
-	fat16_fopen(file->fat, file, file->clu_start, 0);
+	open_file(file->fat, file, file->clu_start, 0);
 	return true;
 }
 
 
 void fat16_open_root(const FAT16* fat, FAT16_FILE* file)
 {
-	fat16_fopen(fat, file, 0, 0);
+	open_file(fat, file, 0, 0);
 }
 
 
@@ -698,7 +697,7 @@ bool fat16_newfile(FAT16_FILE* dir, FAT16_FILE* file, const char* name)
 		// Resolve addres of next file entry
 		uint32_t addr;
 		do {
-			addr = clu_add(fat, dir->clu, num * 32);
+			addr = clu_offs(fat, dir->clu, num * 32);
 
 			if (addr == 0xFFFF)
 			{
@@ -712,14 +711,14 @@ bool fat16_newfile(FAT16_FILE* dir, FAT16_FILE* file, const char* name)
 
 
 		// Open the file entry
-		fat16_fopen(fat, file, clu, num);
+		open_file(fat, file, clu, num);
 
 
 		// Check if can be overwritten
 		if (file->type == FT_DELETED || file->type == FT_NONE)
 		{
 			const uint16_t newclu = alloc_cluster(fat);
-			const uint32_t entrystart = clu_add(fat, clu, num * 32);
+			const uint32_t entrystart = clu_offs(fat, clu, num * 32);
 
 			// store the file name
 			fat->dev->seek(entrystart);
@@ -742,7 +741,7 @@ bool fat16_newfile(FAT16_FILE* dir, FAT16_FILE* file, const char* name)
 			fat->dev->write16(0);
 
 			// reopen file, load the information just written
-			fat16_fopen(fat, file, clu, num);
+			open_file(fat, file, clu, num);
 			return true;
 		}
 	}
@@ -908,7 +907,7 @@ void fat16_set_file_size(FAT16_FILE* file, uint32_t size)
 	const BLOCKDEV* dev = file->fat->dev;
 
 	// Find address for storing the size
-	const uint32_t addr = clu_add(fat, file->clu, file->num * 32 + 28);
+	const uint32_t addr = clu_offs(fat, file->clu, file->num * 32 + 28);
 	file->size = size;
 
 	dev->seek(addr);
@@ -935,7 +934,7 @@ void fat16_delete_file(FAT16_FILE* file)
 	const FAT16* fat = file->fat;
 
 	// seek to file record
-	fat->dev->seek(clu_add(fat, file->clu, file->num * 32));
+	fat->dev->seek(clu_offs(fat, file->clu, file->num * 32));
 
 	// mark as deleted
 	fat->dev->write(0xE5); // "deleted" mark
