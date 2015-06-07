@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "fat16.h"
 
@@ -117,12 +118,34 @@ int main(int argc, char const *argv[])
 
 	} while (fat16_next(&file));
 
-	//FAT16_FILE file2;
 	fat16_open_root(&fat, &file);
-	//fat16_newfile(&file, &file2, "nuclear.war");
 
-	printf("Exists? %d\n", fat16_find_file(&file, "HAMLET.TXT"));
+	printf("Exists? %d\n", fat16_find_file(&file, "nuclear.war"));
 	printf("Size: %d\n", file.size);
+
+	//fat16_fseek(&file, 40000);
+	//fat16_fwrite(&file, "BANANA", 6);
+
+	//FAT16_FILE neu;
+	//fat16_newfile(&file, &neu, "NEWFILE.MP3");
+	//fat16_fwrite(&neu, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", 16);
+
+
+	//char* text = "KUNDA";
+	//fat16_fseek(&file, 30000);
+	//fat16_fwrite(&file, text, strlen(text));
+
+	//fat16_fseek(&file, 30000);
+
+	//char boo[5];
+	//bool v = fat16_fread(&file, boo, 5);
+
+//	if (!v) {
+//		printf("FAIL!\n");
+//		return 1;
+//	}
+//
+//	printf("%.5s\n", boo);
 
 	test_close();
 

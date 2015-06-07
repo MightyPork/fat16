@@ -154,6 +154,11 @@ bool fat16_fseek(FAT16_FILE* file, uint32_t addr);
  */
 bool fat16_fread(FAT16_FILE* file, void* target, uint32_t len);
 
+/**
+ * Write into file at a "seek" position.
+ * "seek" cursor must be within (0..filesize)
+ */
+bool fat16_fwrite(FAT16_FILE* file, void* src, uint32_t len);
 
 /**
  * Create a new file in given folder
