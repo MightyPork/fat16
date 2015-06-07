@@ -3,13 +3,17 @@
 /** Abstract block device interface */
 typedef struct {
 	// Sequential read
-	void (*read)(void* dest, const uint16_t len);
-	// Read at address
-	void (*aread)(void* dest, const uint16_t len, const uint32_t addr);
+	void (*load)(void* dest, const uint16_t len);
 	// Sequential write
-	void (*write)(const void* src, const uint16_t len);
-	// Write at address
-	void (*awrite)(const void* src, const uint16_t len, const uint32_t addr);
+	void (*store)(const void* src, const uint16_t len);
+	// Sequential byte write
+	void (*write)(const uint8_t b);
+	// Sequential 2-byte write
+	void (*write16)(const uint16_t b);
+	// Sequential byte read
+	uint8_t (*read)(void);
+	// Sequential 2-byte read
+	uint16_t (*read16)(void);
 	// Absolute seek
 	void (*seek)(const uint32_t);
 	// Relative seek
@@ -89,10 +93,9 @@ typedef struct __attribute__((packed)) {
 
 	// Fields loaded directly from disk:
 
-	uint8_t name[8]; // Starting 0x05 converted to 0xE5, other "magic chars" left intact
-	uint8_t ext[3];
+	uint8_t name[11]; // Starting 0x05 converted to 0xE5, other "magic chars" left intact
 	uint8_t attribs; // composed of FA_* constants
-	// 12 bytes skipped
+	// 14 bytes skipped
 	uint16_t clu_start;
 	uint32_t size;
 
@@ -152,6 +155,16 @@ bool fat16_fseek(FAT16_FILE* file, uint32_t addr);
 bool fat16_fread(FAT16_FILE* file, void* target, uint32_t len);
 
 
+/**
+ * Create a new file in given folder
+ *
+ * directory ... parent folder's first entry
+ * file ... where to store info about newly opened file
+ * name ... name of the new file, including extension
+ */
+bool fat16_newfile(FAT16_FILE* directory, FAT16_FILE* file, const char* name);
+
+
 
 // --------- NAVIGATION ------------
 
@@ -159,14 +172,21 @@ bool fat16_fread(FAT16_FILE* file, void* target, uint32_t len);
 /** Go to previous file in the directory (false = no prev file) */
 bool fat16_prev(FAT16_FILE* file);
 
-
 /** Go to next file in directory (false = no next file) */
 bool fat16_next(FAT16_FILE* file);
-
 
 /** Open a directory (file is a directory entry) */
 bool fat16_opendir(FAT16_FILE* file);
 
+/** Rewind to first file in directory */
+void fat16_first(FAT16_FILE* file);
+
+/**
+ * Find a file with given "display name" in this directory.
+ * If file is found, "dir" will contain it's handle.
+ * Either way, "dir" gets modified and you may need to rewind it afterwards.
+ */
+bool fat16_find_file(FAT16_FILE* dir, const char* name);
 
 
 // -------- FILE INSPECTION -----------
@@ -175,12 +195,15 @@ bool fat16_opendir(FAT16_FILE* file);
 bool fat16_is_file_valid(const FAT16_FILE* file);
 
 
-/** Get opened file's type */
-FAT16_FT fat16_get_type(const FAT16_FILE* file);
-
-
 /**
  * Resolve a file name, trim spaces and add null terminator.
  * Returns the passed char*, or NULL on error.
  */
 char* fat16_display_name(const FAT16_FILE* file, char* str);
+
+/**
+ * Convert filename to zero-padded fixed length one
+ * Returns the passed char*.
+ */
+char* fat16_undisplay_name(const char* name, char* fixed);
+

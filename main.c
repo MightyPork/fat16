@@ -7,7 +7,7 @@
 
 
 
-// ------------- test bed ----------------
+// ------------- test ----------------
 
 BLOCKDEV test;
 FILE* testf;
@@ -22,42 +22,62 @@ void test_rseek(const uint16_t pos)
 	fseek(testf, pos, SEEK_CUR);
 }
 
-void test_read(void* dest, const uint16_t len)
+void test_load(void* dest, const uint16_t len)
 {
-	for (int a = 0; a < len; a++) {
-		fread(dest+a, 1, 1, testf);
-	}
+	fread(dest, len, 1, testf);
+//	for (int a = 0; a < len; a++) {
+//		fread(dest+a, 1, 1, testf);
+//	}
 }
 
-void test_aread(void* dest, const uint16_t len, const uint32_t addr)
+void test_store(const void* source, const uint16_t len)
 {
-	test_seek(addr);
-	test_read(dest, len);
+	fwrite(source, len, 1, testf);
+
+//	for (int a = 0; a < len; a++) {
+//		fwrite(source+a, 1, 1, testf);
+//	}
 }
 
-void test_write(const void* source, const uint16_t len)
+void test_write(const uint8_t b)
 {
-	for (int a = 0; a < len; a++) {
-		fwrite(source+a, 1, 1, testf);
-	}
+	fwrite(&b, 1, 1, testf);
 }
 
-void test_awrite(const void* source, const uint16_t len, const uint32_t addr)
+void test_write16(const uint16_t b)
 {
-	test_seek(addr);
-	test_write(source, len);
+	fwrite(&b, 2, 1, testf);
+}
+
+uint8_t test_read()
+{
+	uint8_t a;
+	fread(&a, 1, 1, testf);
+	return a;
+}
+
+uint16_t test_read16()
+{
+	uint16_t a;
+	fread(&a, 2, 1, testf);
+	return a;
 }
 
 void test_open()
 {
 	test.read = &test_read;
-	test.aread = &test_aread;
 	test.write = &test_write;
-	test.awrite = &test_awrite;
+
+	test.read16 = &test_read16;
+	test.write16 = &test_write16;
+
+	test.load = &test_load;
+	test.store = &test_store;
+
 	test.seek = &test_seek;
 	test.rseek = &test_rseek;
 
-	testf = fopen("imgs/dump_sd.img", "rb+");
+	testf = fopen("imgs/hamlet.img", "rb+");
 }
 
 void test_close()
@@ -96,6 +116,13 @@ int main(int argc, char const *argv[])
 			file.type, file.size);
 
 	} while (fat16_next(&file));
+
+	//FAT16_FILE file2;
+	fat16_open_root(&fat, &file);
+	//fat16_newfile(&file, &file2, "nuclear.war");
+
+	printf("Exists? %d\n", fat16_find_file(&file, "HAMLET.TXT"));
+	printf("Size: %d\n", file.size);
 
 	test_close();
 
