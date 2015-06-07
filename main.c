@@ -18,7 +18,7 @@ void test_seek(const uint32_t pos)
 	fseek(testf, pos, SEEK_SET);
 }
 
-void test_rseek(const uint16_t pos)
+void test_rseek(const int16_t pos)
 {
 	fseek(testf, pos, SEEK_CUR);
 }
@@ -112,22 +112,43 @@ int main(int argc, char const *argv[])
 	do {
 		if (!fat16_is_file_valid(&file)) continue;
 
-		printf("File name: %s, %c, %d B\n",
+		printf("File name: %s, %c, %d B, @ 0x%x\n",
 			fat16_display_name(&file, str),
-			file.type, file.size);
+			file.type, file.size, file.clu_start);
 
 	} while (fat16_next(&file));
 
 	fat16_open_root(&fat, &file);
 
-	printf("Exists? %d\n", fat16_find_file(&file, "nuclear.war"));
-	printf("Size: %d\n", file.size);
+//	bool found = fat16_find_file(&file, "NEW_FILE.DAT");
+//
+//	if (found)
+//	{
+//		fat16_delete_file(&file);
+//		fat16_set_file_size(&file, 16000);
+//	}
+
+	//printf("Exists? %d\n", fat16_find_file(&file, "nuclear.war"));
+	//printf("Size: %d\n", file.size);
+
+	//fat16_set_file_size(&file, 5);
 
 	//fat16_fseek(&file, 40000);
 	//fat16_fwrite(&file, "BANANA", 6);
 
-	//FAT16_FILE neu;
-	//fat16_newfile(&file, &neu, "NEWFILE.MP3");
+//	FAT16_FILE neu;
+//	bool ok = fat16_newfile(&file, &neu, "NEWFILE3.DAT");
+//	if (!ok) {
+//		printf("FAIL.");
+//		return -1;
+//	}
+//
+//	char c = '_';
+//	for (uint16_t i = 0; i < 35000; i++) {
+//		fat16_fwrite(&neu, &i, 2);
+//		fat16_fwrite(&neu, &c, 1);
+//	}
+
 	//fat16_fwrite(&neu, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", 16);
 
 
@@ -146,6 +167,15 @@ int main(int argc, char const *argv[])
 //	}
 //
 //	printf("%.5s\n", boo);
+
+
+//	char ham[20000];
+//
+//	fat16_find_file(&file, "HAMLET.TXT");
+//	fat16_fread(&file, ham, 20000);
+//	ham[19999] = 0;
+//	printf("%s\n", ham);
+
 
 	test_close();
 

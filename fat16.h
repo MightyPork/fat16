@@ -17,7 +17,7 @@ typedef struct {
 	// Absolute seek
 	void (*seek)(const uint32_t);
 	// Relative seek
-	void (*rseek)(const uint16_t);
+	void (*rseek)(const int16_t);
 } BLOCKDEV;
 
 
@@ -169,7 +169,14 @@ bool fat16_fwrite(FAT16_FILE* file, void* src, uint32_t len);
  */
 bool fat16_newfile(FAT16_FILE* directory, FAT16_FILE* file, const char* name);
 
+/**
+ * Write new file size (also to the disk).
+ * Allocates / frees needed clusters, does not erase them.
+ */
+void fat16_set_file_size(FAT16_FILE* file, uint32_t size);
 
+/** Delete a file entry and free clusters. Does NOT descend into subdirectories. */
+void fat16_delete_file(FAT16_FILE* file);
 
 // --------- NAVIGATION ------------
 

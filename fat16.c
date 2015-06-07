@@ -16,7 +16,7 @@ void read_bs(const BLOCKDEV* dev, Fat16BootSector* info, const uint32_t addr);
 uint32_t find_bs(const BLOCKDEV* dev);
 
 /** Get cluster's starting address */
-uint32_t clu_start(const FAT16* fat, const uint16_t cluster);
+uint32_t clu_addr(const FAT16* fat, const uint16_t cluster);
 
 /** Find following cluster using FAT for jumps */
 uint16_t next_clu(const FAT16* fat, uint16_t cluster);
@@ -36,14 +36,20 @@ uint16_t alloc_cluster(const FAT16* fat);
 /** Zero out entire cluster. */
 void wipe_cluster(const FAT16* fat, const uint16_t clu);
 
-/** Write new file size (also to the disk). Does not allocate clusters. */
-void set_file_size(FAT16_FILE* file, uint32_t size);
+/** Free cluster chain, starting at given number */
+void free_cluster_chain(const FAT16* fat, uint16_t clu);
 
 /**
  * Check if there is already a file of given RAW name
  * Raw name - name as found on disk, not "display name".
  */
 bool dir_contains_file_raw(FAT16_FILE* dir, char* fname);
+
+/** Write a value into FAT */
+void write_fat(const FAT16* fat, const uint16_t cluster, const uint16_t value);
+
+/** Read a value from FAT */
+uint16_t read_fat(const FAT16* fat, const uint16_t cluster);
 
 
 // =========== INTERNAL FUNCTION IMPLEMENTATIONS =========
@@ -126,8 +132,22 @@ void read_bs(const BLOCKDEV* dev, Fat16BootSector* info, const uint32_t addr)
 }
 
 
+void write_fat(const FAT16* fat, const uint16_t cluster, const uint16_t value)
+{
+	fat->dev->seek(fat->fat_addr + (cluster * 2));
+	fat->dev->write16(value);
+}
+
+
+uint16_t read_fat(const FAT16* fat, const uint16_t cluster)
+{
+	fat->dev->seek(fat->fat_addr + (cluster * 2));
+	return fat->dev->read16();
+}
+
+
 /** Get cluster starting address */
-uint32_t clu_start(const FAT16* fat, const uint16_t cluster)
+uint32_t clu_addr(const FAT16* fat, const uint16_t cluster)
 {
 	if (cluster < 2) return fat->rd_addr;
 	return fat->data_addr + (cluster - 2) * fat->bs.bytes_per_cluster;
@@ -136,8 +156,7 @@ uint32_t clu_start(const FAT16* fat, const uint16_t cluster)
 
 uint16_t next_clu(const FAT16* fat, uint16_t cluster)
 {
-	fat->dev->seek(fat->fat_addr + (cluster * 2));
-	return fat->dev->read16();
+	return read_fat(fat, cluster);
 }
 
 
@@ -151,7 +170,7 @@ uint32_t clu_add(const FAT16* fat, uint16_t cluster, uint32_t addr)
 		addr -= fat->bs.bytes_per_cluster;
 	}
 
-	return clu_start(fat, cluster) + addr;
+	return clu_addr(fat, cluster) + addr;
 }
 
 
@@ -163,7 +182,7 @@ uint32_t clu_add(const FAT16* fat, uint16_t cluster, uint32_t addr)
  */
 void wipe_cluster(const FAT16* fat, const uint16_t clu)
 {
-	uint32_t addr = clu_start(fat, clu);
+	uint32_t addr = clu_addr(fat, clu);
 
 	const BLOCKDEV* dev = fat->dev;
 
@@ -185,14 +204,11 @@ uint16_t alloc_cluster(const FAT16* fat)
 	for (i = 2; i < fat->bs.fat_size_sectors * 256; i++)
 	{
 		// read value from FAT
-		fat->dev->seek(fat->fat_addr + (i * 2));
-		b = fat->dev->read16();
-		if (b == 0)
+		b = read_fat(fat, i);
+		if (b == 0) // unused cluster
 		{
 			// Write FFFF to "i", to mark end of file
-			b = 0xFFFF;
-			fat->dev->seek(fat->fat_addr + (i * 2));
-			fat->dev->write16(b);
+			write_fat(fat, i, 0xFFFF);
 
 			// Wipe the cluster
 			wipe_cluster(fat, i);
@@ -212,10 +228,27 @@ bool append_cluster(const FAT16* fat, const uint16_t clu)
 	if (clu2 == 0xFFFF) return false;
 
 	// Write "i" to "clu"
-	fat->dev->seek(fat->fat_addr + (clu * 2));
-	fat->dev->write16(clu2);
+	write_fat(fat, clu, clu2);
 
 	return true;
+}
+
+
+void free_cluster_chain(const FAT16* fat, uint16_t clu)
+{
+	do {
+		// get address of the next cluster
+		const uint16_t clu2 = read_fat(fat, clu);
+
+		// mark cluster as unused
+		write_fat(fat, clu, 0x0000);
+
+		printf("Cluster free at %d\n", clu);
+
+		// advance
+		clu = clu2;
+
+	} while (clu != 0xFFFF);
 }
 
 
@@ -243,18 +276,6 @@ bool dir_contains_file_raw(FAT16_FILE* dir, char* fname)
 	return false;
 }
 
-
-/** Write new file size (also to the disk). Does not allocate clusters. */
-void set_file_size(FAT16_FILE* file, uint32_t size)
-{
-	// Find address for storing the size
-	const uint32_t addr = clu_add(file->fat, file->clu, file->num * 32 + 28);
-	file->size = size;
-
-	const BLOCKDEV* dev = file->fat->dev;
-	dev->seek(addr);
-	dev->store(&size, 4);
-}
 
 
 // =============== PUBLIC FUNCTION IMPLEMENTATIONS =================
@@ -309,7 +330,7 @@ bool fat16_fseek(FAT16_FILE* file, uint32_t addr)
 		addr -= file->fat->bs.bytes_per_cluster;
 	}
 
-	file->cur_abs = clu_start(file->fat, file->cur_clu) + addr;
+	file->cur_abs = clu_addr(file->fat, file->cur_clu) + addr;
 	file->cur_ofs = addr;
 
 	// Physically seek to that location
@@ -331,7 +352,7 @@ void fat16_fopen(const FAT16* fat, FAT16_FILE* file, const uint16_t dir_cluster,
 	uint32_t addr;
 	if (dir_cluster == 0)
 	{
-		addr = clu_start(fat, dir_cluster) + num * 32; // root directory, max 512 entries.
+		addr = clu_addr(fat, dir_cluster) + num * 32; // root directory, max 512 entries.
 	} else
 	{
 		addr = clu_add(fat, dir_cluster, num * 32); // cluster + N (wrapping to next cluster if needed)
@@ -461,7 +482,7 @@ bool fat16_fread(FAT16_FILE* file, void* target, uint32_t len)
 		if (file->cur_ofs >= fat->bs.bytes_per_cluster)
 		{
 			file->cur_clu = next_clu(fat, file->cur_clu);
-			file->cur_abs = clu_start(fat, file->cur_clu);
+			file->cur_abs = clu_addr(fat, file->cur_clu);
 			file->cur_ofs = 0;
 		}
 
@@ -519,13 +540,13 @@ bool fat16_fwrite(FAT16_FILE* file, void* src, uint32_t len)
 
 				// advance cursors to the next cluster
 				file->cur_clu = next_clu(fat, file->cur_clu);
-				file->cur_abs = clu_start(fat, file->cur_clu);
+				file->cur_abs = clu_addr(fat, file->cur_clu);
 				file->cur_ofs = 0;
 			}
 		}
 
 		// Save new size
-		set_file_size(file, pos_start + len);
+		fat16_set_file_size(file, pos_start + len);
 
 		// Seek back to where it was before
 		fat16_fseek(file, pos_start);
@@ -553,7 +574,7 @@ bool fat16_fwrite(FAT16_FILE* file, void* src, uint32_t len)
 		if (file->cur_ofs >= fat->bs.bytes_per_cluster)
 		{
 			file->cur_clu = next_clu(fat, file->cur_clu);
-			file->cur_abs = clu_start(fat, file->cur_clu);
+			file->cur_abs = clu_addr(fat, file->cur_clu);
 			file->cur_ofs = 0;
 		}
 
@@ -880,7 +901,47 @@ char* fat16_undisplay_name(const char* name, char* fixed)
 }
 
 
+/** Write new file size (also to the disk). Does not allocate clusters. */
+void fat16_set_file_size(FAT16_FILE* file, uint32_t size)
+{
+	const FAT16* fat = file->fat;
+	const BLOCKDEV* dev = file->fat->dev;
+
+	// Find address for storing the size
+	const uint32_t addr = clu_add(fat, file->clu, file->num * 32 + 28);
+	file->size = size;
+
+	dev->seek(addr);
+	dev->store(&size, 4);
+
+	// Seek to the end of the file, to make sure clusters are allocated
+	fat16_fseek(file, size - 1);
+
+	const uint16_t next = next_clu(fat, file->cur_clu);
+	if (next != 0xFFFF)
+	{
+		printf("Trimming file clusters\n");
+
+		free_cluster_chain(fat, next);
+
+		// Mark that there's no further clusters
+		write_fat(fat, file->cur_clu, 0xFFFF);
+	}
+}
 
 
+void fat16_delete_file(FAT16_FILE* file)
+{
+	const FAT16* fat = file->fat;
 
+	// seek to file record
+	fat->dev->seek(clu_add(fat, file->clu, file->num * 32));
 
+	// mark as deleted
+	fat->dev->write(0xE5); // "deleted" mark
+
+	// free allocated clusters
+	free_cluster_chain(fat, file->clu_start);
+
+	file->type = FT_DELETED;
+}
