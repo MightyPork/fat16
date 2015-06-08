@@ -90,12 +90,8 @@ void test_close()
 
 // --- testing ---
 
-int main(int argc, char const *argv[])
+int main()
 {
-	uint32_t i32;
-	uint16_t i16;
-	uint8_t i8;
-
 	test_open();
 
 	// Initialize the FS
@@ -103,22 +99,57 @@ int main(int argc, char const *argv[])
 	fat16_init(&test, &fat);
 
 	FAT16_FILE file;
-	fat16_open_root(&fat, &file);
+	fat16_root(&fat, &file);
 
 	char str[12];
 
-	printf("Disk label: %s\n", fat16_volume_label(&fat, str));
+	printf("Disk label: %s\n", fat16_disk_label(&fat, str));
 
-	do {
+	do
+	{
 		if (!fat16_is_file_valid(&file)) continue;
 
 		printf("File name: %s, %c, %d B, @ 0x%x\n",
-			fat16_display_name(&file, str),
-			file.type, file.size, file.clu_start);
+			   fat16_dispname(&file, str),
+			   file.type, file.size, file.clu_start);
 
-	} while (fat16_next(&file));
+	}
+	while (fat16_next(&file));
 
-	fat16_open_root(&fat, &file);
+	fat16_root(&fat, &file);
+
+	if (fat16_find(&file, "FOLDER"))
+	{
+		if (fat16_opendir(&file))
+		{
+			printf("Listing FOLDER:\n");
+
+			do
+			{
+				printf("File name: %s, %c, %d B, @ 0x%x\n",
+					   fat16_dispname(&file, str),
+					   file.type, file.size, file.clu_start);
+			}
+			while (fat16_next(&file));
+
+			if (fat16_find(&file, "banana.exe"))
+			{
+				char m[49];
+				fat16_fread(&file, m, 49);
+				printf("%.49s\n", m);
+			}
+		}
+	}
+
+	//fat16_mkfile(&file, "banana.exe");
+	//fat16_fwrite(&file, "THIS IS A STRING STORED IN A FILE CALLED BANANA!\n", 49);
+
+//	fat16_find(&file, "banana.exe");
+//	char m[49];
+//	fat16_fread(&file, m, 49);
+//	printf("%.49s\n", m);
+
+	//fat16_mkdir(&file, "FOLDER2");
 
 //	bool found = fat16_find_file(&file, "NEW_FILE.DAT");
 //

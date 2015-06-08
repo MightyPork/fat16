@@ -57,16 +57,16 @@ uint16_t read_fat(const FAT16* fat, const uint16_t cluster);
 /** Find absolute address of first boot sector. Returns 0 on failure. */
 uint32_t find_bs(const BLOCKDEV* dev)
 {
-	//	Reference structure:
+	//  Reference structure:
 	//
-	//	typedef struct __attribute__((packed)) {
-	//		uint8_t first_byte;
-	//		uint8_t start_chs[3];
-	//		uint8_t partition_type;
-	//		uint8_t end_chs[3];
-	//		uint32_t start_sector;
-	//		uint32_t length_sectors;
-	//	} PartitionTable;
+	//  typedef struct __attribute__((packed)) {
+	//      uint8_t first_byte;
+	//      uint8_t start_chs[3];
+	//      uint8_t partition_type;
+	//      uint8_t end_chs[3];
+	//      uint32_t start_sector;
+	//      uint32_t length_sectors;
+	//  } PartitionTable;
 
 	uint16_t addr = 0x1BE + 4; // fourth byte of structure is the type.
 	uint32_t tmp = 0;
@@ -121,7 +121,8 @@ void read_bs(const BLOCKDEV* dev, Fat16BootSector* info, const uint32_t addr)
 	if (info->total_sectors == 0)
 	{
 		dev->load(&(info->total_sectors), 4);
-	} else
+	}
+	else
 	{
 		dev->rseek(4); // tsl
 	}
@@ -236,19 +237,18 @@ bool append_cluster(const FAT16* fat, const uint16_t clu)
 
 void free_cluster_chain(const FAT16* fat, uint16_t clu)
 {
-	do {
+	do
+	{
 		// get address of the next cluster
 		const uint16_t clu2 = read_fat(fat, clu);
 
 		// mark cluster as unused
 		write_fat(fat, clu, 0x0000);
 
-		printf("Cluster free at %d\n", clu);
-
 		// advance
 		clu = clu2;
-
-	} while (clu != 0xFFFF);
+	}
+	while (clu != 0xFFFF);
 }
 
 
@@ -258,7 +258,8 @@ void free_cluster_chain(const FAT16* fat, uint16_t clu)
  */
 bool dir_contains_file_raw(FAT16_FILE* dir, char* fname)
 {
-	do {
+	do
+	{
 		bool diff = false;
 		for (uint8_t i = 0; i < 11; i++)
 		{
@@ -271,7 +272,8 @@ bool dir_contains_file_raw(FAT16_FILE* dir, char* fname)
 
 		if (!diff) return true;
 
-	} while (fat16_next(dir));
+	}
+	while (fat16_next(dir));
 
 	return false;
 }
@@ -290,7 +292,8 @@ void open_file(const FAT16* fat, FAT16_FILE* file, const uint16_t dir_cluster, c
 	if (dir_cluster == 0)
 	{
 		addr = clu_addr(fat, dir_cluster) + num * 32; // root directory, max 512 entries.
-	} else
+	}
+	else
 	{
 		addr = clu_offs(fat, dir_cluster, num * 32); // cluster + N (wrapping to next cluster if needed)
 	}
@@ -307,7 +310,7 @@ void open_file(const FAT16* fat, FAT16_FILE* file, const uint16_t dir_cluster, c
 
 	file->type = FT_FILE;
 
-	switch(file->name[0])
+	switch (file->name[0])
 	{
 		case 0x00:
 			file->type = FT_NONE;
@@ -327,7 +330,8 @@ void open_file(const FAT16* fat, FAT16_FILE* file, const uint16_t dir_cluster, c
 			{
 				// ".." directory
 				file->type = FT_PARENT;
-			} else
+			}
+			else
 			{
 				// "." directory
 				file->type = FT_SELF;
@@ -382,41 +386,43 @@ void fat16_init(const BLOCKDEV* dev, FAT16* fat)
  */
 bool fat16_fseek(FAT16_FILE* file, uint32_t addr)
 {
+	const FAT16* fat = file->fat;
+
 	// Store as rel
 	file->cur_rel = addr;
 
 	// Rewind and resolve abs, clu, ofs
 	file->cur_clu = file->clu_start;
 
-	while (addr >= file->fat->bs.bytes_per_cluster)
+	while (addr >= fat->bs.bytes_per_cluster)
 	{
 		uint32_t next;
 
 		// Go to next cluster, allocate if needed
-		do {
-			next = next_clu(file->fat, file->cur_clu);
+		do
+		{
+			next = next_clu(fat, file->cur_clu);
 			if (next == 0xFFFF)
 			{
 				// reached end of allocated space
 				// add one more cluster
-				if (!append_cluster(file->fat, file->cur_clu))
+				if (!append_cluster(fat, file->cur_clu))
 				{
 					return false;
 				}
-				printf("Allocating new cluster due to seek past EOF\n");
 			}
-		} while(next == 0xFFFF);
-
+		}
+		while (next == 0xFFFF);
 
 		file->cur_clu = next;
-		addr -= file->fat->bs.bytes_per_cluster;
+		addr -= fat->bs.bytes_per_cluster;
 	}
 
-	file->cur_abs = clu_addr(file->fat, file->cur_clu) + addr;
+	file->cur_abs = clu_addr(fat, file->cur_clu) + addr;
 	file->cur_ofs = addr;
 
 	// Physically seek to that location
-	file->fat->dev->seek(file->cur_abs);
+	fat->dev->seek(file->cur_abs);
 
 	return true;
 }
@@ -427,7 +433,8 @@ bool fat16_fseek(FAT16_FILE* file, uint32_t addr)
  */
 bool fat16_is_file_valid(const FAT16_FILE* file)
 {
-	switch (file->type) {
+	switch (file->type)
+	{
 		case FT_FILE:
 		case FT_SUBDIR:
 		case FT_SELF:
@@ -444,18 +451,11 @@ bool fat16_is_file_valid(const FAT16_FILE* file)
 
 bool fat16_fread(FAT16_FILE* file, void* target, uint32_t len)
 {
-	if (file->cur_abs == 0xFFFF) {
-		printf("File at 0xFFFF\n");
+	if (file->cur_abs == 0xFFFF)
 		return false; // file at the end already
-	}
 
 	if (file->cur_rel + len > file->size)
-	{
-		// Attempt to read more than what is available
-		printf("Attempt to read more than what is available\n");
-		return false;
-	}
-
+		return false; // Attempt to read more than what is available
 
 	const FAT16* fat = file->fat;
 	const BLOCKDEV* dev = fat->dev;
@@ -493,7 +493,7 @@ bool fat16_fread(FAT16_FILE* file, void* target, uint32_t len)
 }
 
 
-bool fat16_fwrite(FAT16_FILE* file, void* src, uint32_t len)
+bool fat16_fwrite(FAT16_FILE* file, void* source, uint32_t len)
 {
 	const FAT16* fat = file->fat;
 	const BLOCKDEV* dev = fat->dev;
@@ -507,8 +507,10 @@ bool fat16_fwrite(FAT16_FILE* file, void* src, uint32_t len)
 	{
 		const uint32_t pos_start = file->cur_rel;
 
-		// Seek to the last position, using fseek to allocate clusters
-		if (!fat16_fseek(file, pos_start + len)) return false;
+		// Seek to the last position
+		// -> fseek will allocate clusters
+		if (!fat16_fseek(file, pos_start + len))
+			return false; // error in seek
 
 		// Write starts beyond EOF - creating a zero-filled "hole"
 		if (file->cur_rel > file->size)
@@ -532,8 +534,6 @@ bool fat16_fwrite(FAT16_FILE* file, void* src, uint32_t len)
 					dev->write(0);
 				}
 
-				printf("Wrote %d filler zeros.\n", chunk);
-
 				// subtract from "needed" what was just placed
 				fill -= chunk;
 
@@ -545,7 +545,7 @@ bool fat16_fwrite(FAT16_FILE* file, void* src, uint32_t len)
 		}
 
 		// Save new size
-		fat16_set_file_size(file, pos_start + len);
+		fat16_resize(file, pos_start + len);
 
 		// Seek back to where it was before
 		fat16_fseek(file, pos_start);
@@ -560,24 +560,24 @@ bool fat16_fwrite(FAT16_FILE* file, void* src, uint32_t len)
 
 		// store the chunk
 		dev->seek(file->cur_abs);
-		dev->store(src, chunk);
+		dev->store(source, chunk);
 
 		// advance cursors
 		file->cur_abs += chunk;
 		file->cur_rel += chunk;
 		file->cur_ofs += chunk;
 
-		src += chunk; // advance the source pointer
+		// Pointer arith!
+		source += chunk; // advance the source pointer
 
 		// detect cluster overflow
 		if (file->cur_ofs >= fat->bs.bytes_per_cluster)
 		{
+			// advance to following cluster
 			file->cur_clu = next_clu(fat, file->cur_clu);
 			file->cur_abs = clu_addr(fat, file->cur_clu);
 			file->cur_ofs = 0;
 		}
-
-		printf("Stored %d bytes of data.\n", chunk);
 
 		// subtract written length
 		len -= chunk;
@@ -597,20 +597,16 @@ bool fat16_next(FAT16_FILE* file)
 	if (file->clu == 0 && file->num >= fat->bs.root_entries)
 		return false; // attempt to read outside root directory.
 
-	uint32_t addr = clu_offs(fat, file->clu, (file->num + 1) * 32);
+	const uint32_t addr = clu_offs(fat, file->clu, (file->num + 1) * 32);
 	if (addr == 0xFFFF)
 		return false; // next file is out of the directory cluster
 
-	// read first byte of the file entry; if zero, can't read (file is NONE)
-	// FIXME this may be a problem when creating a new file...?
-	uint8_t x;
+	// read first byte of the file entry
 	dev->seek(addr);
-	x = dev->read();
+	if (dev->read() == 0)
+		return false; // can't read (file is NONE)
 
-	if (x == 0)
-		return false;
-
-	open_file(fat, file, file->clu, file->num+1);
+	open_file(fat, file, file->clu, file->num + 1);
 
 	return true;
 }
@@ -622,11 +618,7 @@ bool fat16_prev(FAT16_FILE* file)
 	if (file->num == 0)
 		return false; // first file already
 
-	open_file(file->fat, file, file->clu, file->num-1);
-
-/*	// Skip bad files
-	if (!fat16_is_file_valid(file))
-		fat16_prev(file);*/
+	open_file(file->fat, file, file->clu, file->num - 1);
 
 	return true;
 }
@@ -639,7 +631,7 @@ void fat16_first(FAT16_FILE* file)
 }
 
 
-/** Open a directory */
+/** Open a directory denoted by the file. */
 bool fat16_opendir(FAT16_FILE* file)
 {
 	// Don't open non-dirs and "." directory.
@@ -651,7 +643,7 @@ bool fat16_opendir(FAT16_FILE* file)
 }
 
 
-void fat16_open_root(const FAT16* fat, FAT16_FILE* file)
+void fat16_root(const FAT16* fat, FAT16_FILE* file)
 {
 	open_file(fat, file, 0, 0);
 }
@@ -662,104 +654,170 @@ void fat16_open_root(const FAT16* fat, FAT16_FILE* file)
  * If file is found, "dir" will contain it's handle.
  * Either way, "dir" gets modified and you may need to rewind it afterwards.
  */
-bool fat16_find_file(FAT16_FILE* dir, const char* name)
+bool fat16_find(FAT16_FILE* dir, const char* name)
 {
 	char fname[11];
-	fat16_undisplay_name(name, fname);
+	fat16_rawname(name, fname);
 	return dir_contains_file_raw(dir, fname);
 }
 
 
-bool fat16_newfile(FAT16_FILE* dir, FAT16_FILE* file, const char* name)
+/** Go through a directory, and open first NONE or DELETED file. */
+bool find_empty_file_slot(FAT16_FILE* file)
 {
-	// Convert filename to zero padded raw string
-	char fname[11];
-	fat16_undisplay_name(name, fname);
-
-	// Abort if file already exists
-	bool exists = dir_contains_file_raw(dir, fname);
-	fat16_first(dir); // rewind dir
-	if (exists) return false;
-
+	const uint16_t clu = file->clu;
+	const FAT16* fat = file->fat;
 
 	// Find free directory entry that can be used
-	uint16_t clu = dir->clu;
-	const FAT16* fat = dir->fat;
-
 	for (uint16_t num = 0; num < 0xFFFF; num++)
 	{
 		// root directory has fewer entries, error if trying
 		// to add one more.
-		if (dir->clu == 0 && num >= fat->bs.root_entries)
+		if (file->clu == 0 && num >= fat->bs.root_entries)
 			return false;
-
 
 		// Resolve addres of next file entry
 		uint32_t addr;
-		do {
-			addr = clu_offs(fat, dir->clu, num * 32);
+		do
+		{
+			addr = clu_offs(fat, file->clu, num * 32);
 
 			if (addr == 0xFFFF)
 			{
 				// end of chain of allocated clusters for the directory
 				// append new cluster, return false on failure
-				if (!append_cluster(fat, dir->clu)) return false;
+				if (!append_cluster(fat, file->clu)) return false;
 			}
 
 			// if new cluster was just added, repeat.
-		} while (addr == 0xFFFF);
-
+		}
+		while (addr == 0xFFFF);
 
 		// Open the file entry
 		open_file(fat, file, clu, num);
 
-
 		// Check if can be overwritten
 		if (file->type == FT_DELETED || file->type == FT_NONE)
 		{
-			const uint16_t newclu = alloc_cluster(fat);
-			const uint32_t entrystart = clu_offs(fat, clu, num * 32);
-
-			// store the file name
-			fat->dev->seek(entrystart);
-
-			// filename, without dor, zero-padded.
-			fat->dev->store(fname, 11);
-
-			fat->dev->write(0); // attributes
-
-			// 10 reserved, 2+2 date & time
-			for (uint8_t i = 0; i < 14; i++)
-			{
-				fat->dev->write(0);
-			}
-
-			fat->dev->write16(newclu); // starting cluster
-
-			// file size (uint32_t)
-			fat->dev->write16(0);
-			fat->dev->write16(0);
-
-			// reopen file, load the information just written
-			open_file(fat, file, clu, num);
 			return true;
 		}
 	}
-	return false;
+
+	return false; // not found.
 }
 
 
-char* fat16_volume_label(const FAT16* fat, char* str)
+/** Write information into a file header (alloc first cluster). "file" is an open handle. */
+void write_file_header(FAT16_FILE* file, const char* fname, const uint8_t attribs, const uint16_t newclu)
+{
+	const FAT16* fat = file->fat;
+	const BLOCKDEV* dev = fat->dev;
+
+	const uint32_t entrystart = clu_offs(fat, file->clu, file->num * 32);
+
+	// store the file name
+	dev->seek(entrystart);
+	dev->store(fname, 11);
+
+	// attributes
+	dev->write(attribs);
+
+	// 10 reserved, 2+2 date & time
+	// (could just skip, but better to fill with zeros)
+	for (uint8_t i = 0; i < 14; i++)
+	{
+		dev->write(0);
+	}
+
+	// addr of the first file cluster
+	dev->write16(newclu);
+
+	// file size (uint32_t)
+	dev->write16(0);
+	dev->write16(0);
+
+	// reopen file - load & parse the information just written
+	open_file(fat, file, file->clu, file->num);
+}
+
+
+bool fat16_mkfile(FAT16_FILE* file, const char* name)
+{
+	// Convert filename to zero padded raw string
+	char fname[11];
+	fat16_rawname(name, fname);
+
+	// Abort if file already exists
+	bool exists = dir_contains_file_raw(file, fname);
+	fat16_first(file); // rewind dir
+	if (exists)
+		return false; // file already exists in the dir.
+
+
+	if (!find_empty_file_slot(file))
+		return false; // error finding a slot
+
+	// Write into the new slot
+	const uint16_t newclu = alloc_cluster(file->fat);
+	write_file_header(file, fname, 0, newclu);
+
+	return true;
+}
+
+
+/**
+ * Create a sub-directory of given name.
+ * Directory is allocated and populated with entries "." and ".."
+ */
+bool fat16_mkdir(FAT16_FILE* file, const char* name)
+{
+	// Convert filename to zero padded raw string
+	char fname[11];
+	fat16_rawname(name, fname);
+
+	// Abort if file already exists
+	bool exists = dir_contains_file_raw(file, fname);
+	fat16_first(file); // rewind dir
+	if (exists)
+		return false; // file already exusts in the dir.
+
+	if (!find_empty_file_slot(file))
+		return false; // error finding a slot
+
+
+	// Write into the new slot
+	const uint16_t newclu = alloc_cluster(file->fat);
+	write_file_header(file, fname, FA_DIR, newclu);
+
+	const uint32_t parent_clu = file->clu;
+	open_file(file->fat, file, file->clu_start, 0);
+
+	write_file_header(file, ".          ", FA_DIR, newclu);
+
+	// Advance to next file slot
+	find_empty_file_slot(file);
+
+	write_file_header(file, "..         ", FA_DIR, parent_clu);
+
+	// rewind.
+	fat16_first(file);
+
+	return true;
+}
+
+
+char* fat16_disk_label(const FAT16* fat, char* label_out)
 {
 	FAT16_FILE first;
-	fat16_open_root(fat, &first);
+	fat16_root(fat, &first);
 
-	if (first.type == FT_LABEL) {
-		return fat16_display_name(&first, str);
+	if (first.type == FT_LABEL)
+	{
+		return fat16_dispname(&first, label_out);
 	}
 
 	// find where spaces end
-	uint8_t j = 10;
+	int8_t j = 10;
 	for (; j >= 0; j--)
 	{
 		if (fat->bs.volume_label[j] != ' ') break;
@@ -769,25 +827,25 @@ char* fat16_volume_label(const FAT16* fat, char* str)
 	uint8_t i;
 	for (i = 0; i <= j; i++)
 	{
-		str[i] = fat->bs.volume_label[i];
+		label_out[i] = fat->bs.volume_label[i];
 	}
 
-	str[i] = 0; // ender
+	label_out[i] = 0; // ender
 
-	return str;
+	return label_out;
 }
 
 
-char* fat16_display_name(const FAT16_FILE* file, char* str)
+char* fat16_dispname(const FAT16_FILE* file, char* disp_out)
 {
 	// Cannot get name for special files
 	if (file->type == FT_NONE ||        // not-yet-used directory location
-		file->type == FT_DELETED ||     // deleted file entry
-		file->attribs == 0x0F)          // long name special entry (system, hidden)
+			file->type == FT_DELETED ||     // deleted file entry
+			file->attribs == 0x0F)          // long name special entry (system, hidden)
 		return NULL;
 
 	// find first non-space
-	uint8_t j = 7;
+	int8_t j = 7;
 	for (; j >= 0; j--)
 	{
 		if (file->name[j] != ' ') break;
@@ -798,37 +856,37 @@ char* fat16_display_name(const FAT16_FILE* file, char* str)
 	uint8_t i;
 	for (i = 0; i <= j; i++)
 	{
-		str[i] = file->name[i];
+		disp_out[i] = file->name[i];
 	}
 
 
 	// directory entry, no extension
 	if (file->type == FT_SUBDIR || file->type == FT_SELF || file->type == FT_PARENT)
 	{
-		str[i] = 0; // end of string
-		return str;
+		disp_out[i] = 0; // end of string
+		return disp_out;
 	}
 
 
 	// add a dot
 	if (file->type != FT_LABEL) // volume label has no dot!
-		str[i++] = '.';
+		disp_out[i++] = '.';
 
 	// Add extension chars
 	for (j = 8; j < 11; j++, i++)
 	{
 		const char c = file->name[j];
 		if (c == ' ') break;
-		str[i] = c;
+		disp_out[i] = c;
 	}
 
-	str[i] = 0; // end of string
+	disp_out[i] = 0; // end of string
 
-	return str;
+	return disp_out;
 }
 
 
-char* fat16_undisplay_name(const char* name, char* fixed)
+char* fat16_rawname(const char* disp_in, char* raw_out)
 {
 	uint8_t name_c = 0, wr_c = 0;
 	bool filling = false;
@@ -836,9 +894,10 @@ char* fat16_undisplay_name(const char* name, char* fixed)
 	for (; wr_c < 11; wr_c++)
 	{
 		// start filling with spaces if end of filename reached
-		char c = name[name_c];
+		uint8_t c = disp_in[name_c];
 		// handle special rule for 0xE5
-		if (name_c == 0 && c == 0xE5) {
+		if (name_c == 0 && c == 0xE5)
+		{
 			c = 0x05;
 		}
 
@@ -851,7 +910,7 @@ char* fat16_undisplay_name(const char* name, char* fixed)
 				if (c == '.')
 				{
 					name_c++; // skip the dot
-					c = name[name_c];
+					c = disp_in[name_c];
 					at_ext = true;
 				}
 			}
@@ -863,13 +922,14 @@ char* fat16_undisplay_name(const char* name, char* fixed)
 			if (!at_ext)
 			{
 				// try to advance past dot (if any)
-				while(true)
+				while (true)
 				{
-					c = name[name_c++];
+					c = disp_in[name_c++];
 					if (c == 0) break;
-					if (c == '.') {
+					if (c == '.')
+					{
 						// read char PAST the dot
-						c = name[name_c];
+						c = disp_in[name_c];
 						at_ext = true;
 						break;
 					}
@@ -887,21 +947,21 @@ char* fat16_undisplay_name(const char* name, char* fixed)
 		if (!filling)
 		{
 			// copy char of filename
-			fixed[wr_c] = name[name_c++];
+			raw_out[wr_c] = disp_in[name_c++];
 		}
 		else
 		{
 			// add a filler space
-			fixed[wr_c] = ' ';
+			raw_out[wr_c] = ' ';
 		}
 	}
 
-	return fixed;
+	return raw_out;
 }
 
 
 /** Write new file size (also to the disk). Does not allocate clusters. */
-void fat16_set_file_size(FAT16_FILE* file, uint32_t size)
+void fat16_resize(FAT16_FILE* file, uint32_t size)
 {
 	const FAT16* fat = file->fat;
 	const BLOCKDEV* dev = file->fat->dev;
@@ -919,8 +979,6 @@ void fat16_set_file_size(FAT16_FILE* file, uint32_t size)
 	const uint16_t next = next_clu(fat, file->cur_clu);
 	if (next != 0xFFFF)
 	{
-		printf("Trimming file clusters\n");
-
 		free_cluster_chain(fat, next);
 
 		// Mark that there's no further clusters
@@ -929,7 +987,7 @@ void fat16_set_file_size(FAT16_FILE* file, uint32_t size)
 }
 
 
-void fat16_delete_file(FAT16_FILE* file)
+void fat16_delete(FAT16_FILE* file)
 {
 	const FAT16* fat = file->fat;
 
