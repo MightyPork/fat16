@@ -37,3 +37,9 @@
 *.cbp
 objs/
 bin/
+
+# QtCreator crap
+*.pro
+*.pro.user
+*.pri
+
