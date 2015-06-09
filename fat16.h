@@ -33,6 +33,7 @@ typedef enum
 	FT_PARENT = 'P',
 	FT_LABEL = 'L',
 	FT_LFN = '~',
+	FT_INVALID = 'i', // not recognized weird file
 	FT_SELF = '.',
 	FT_FILE = 'F'
 } FAT16_FT;
@@ -194,8 +195,18 @@ bool fat16_mkdir(FAT16_FILE* file, const char* name);
 void fat16_resize(FAT16_FILE* file, uint32_t size);
 
 
-/** Delete a file entry and free clusters. Does NOT descend into subdirectories. */
-void fat16_delete(FAT16_FILE* file);
+/**
+ * Delete a file entry and free clusters.
+ * Does NOT work on folders.
+ */
+bool fat16_rmfile(FAT16_FILE* file);
+
+
+/**
+ * Delete an empty directory.
+ * Calling with non-subfolder entry or non-empty directory will cause error.
+ */
+bool fat16_rmdir(FAT16_FILE* file);
 
 // --------- NAVIGATION ------------
 
@@ -213,6 +224,11 @@ bool fat16_next(FAT16_FILE* file);
  * Provided handle changes to first entry of the directory.
  */
 bool fat16_opendir(FAT16_FILE* file);
+
+/**
+ * Open a parent directory. Fails in root.
+ */
+bool fat16_parent(FAT16_FILE* file);
 
 
 /** Rewind to first file in directory */

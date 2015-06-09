@@ -118,31 +118,46 @@ int main()
 
 	fat16_root(&fat, &file);
 
-	if (fat16_find(&file, "FOLDER"))
-	{
-		if (fat16_opendir(&file))
-		{
-			printf("Listing FOLDER:\n");
+//	if (fat16_find(&file, "FOLDER"))
+//	{
+//		if (fat16_opendir(&file))
+//		{
+//			printf("Listing FOLDER:\n");
 
-			do
-			{
-				printf("File name: %s, %c, %d B, @ 0x%x\n",
-					   fat16_dispname(&file, str),
-					   file.type, file.size, file.clu_start);
-			}
-			while (fat16_next(&file));
+//			do
+//			{
+//				printf("File name: %s, %c, %d B, @ 0x%x\n",
+//					   fat16_dispname(&file, str),
+//					   file.type, file.size, file.clu_start);
+//			}
+//			while (fat16_next(&file));
 
-			if (fat16_find(&file, "banana.exe"))
-			{
-				char m[49];
-				fat16_fread(&file, m, 49);
-				printf("%.49s\n", m);
-			}
-		}
-	}
+//			char m[49];
 
-	//fat16_mkfile(&file, "banana.exe");
-	//fat16_fwrite(&file, "THIS IS A STRING STORED IN A FILE CALLED BANANA!\n", 49);
+//			if (fat16_find(&file, "banana.exe"))
+//			{
+//				fat16_fread(&file, m, 49);
+//				printf("%.49s\n", m);
+//			}
+
+//			fat16_rmfile(&file);
+
+//			if (fat16_parent(&file)) {
+//				printf("Current file: %s\n", fat16_dispname(&file, m));
+//			}
+
+//			printf("Found? %d\n", fat16_find(&file, "FOLDER2"));
+//			printf("Deleted? %d\n", fat16_rmdir(&file));
+//		}
+//	}
+
+//	printf("Found? %d\n", fat16_find(&file, "FOLDER2"));
+//	printf("Deleted? %d\n", fat16_rmdir(&file));
+
+//	if (fat16_mkfile(&file, "banana2.exe"))
+//	{
+//		fat16_fwrite(&file, "THIS IS A STRING STORED IN A FILE CALLED BANANA!\n", 49);
+//	}
 
 //	fat16_find(&file, "banana.exe");
 //	char m[49];
