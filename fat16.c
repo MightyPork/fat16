@@ -706,13 +706,13 @@ void fat16_first(FAT16_FILE* file)
 
 
 /** Open a directory denoted by the file. */
-bool fat16_opendir(FAT16_FILE* file)
+bool fat16_opendir(FAT16_FILE* dir)
 {
 	// Don't open non-dirs and "." directory.
-	if (!(file->attribs & FA_DIR) || file->type == FT_SELF)
+	if (!(dir->attribs & FA_DIR) || dir->type == FT_SELF)
 		return false;
 
-	open_file(file->fat, file, file->clu_start, 0);
+	open_file(dir->fat, dir, dir->clu_start, 0);
 	return true;
 }
 
