@@ -31,7 +31,7 @@
 # Debug files
 *.dSYM/
 
-./test
+test
 
 # Code::Blocks garbage
 *.depend

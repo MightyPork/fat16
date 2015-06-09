@@ -151,21 +151,21 @@ char* fat16_disk_label(const FAT16* fat, char* label_out);
  * Move file cursor to a position relative to file start
  * Returns false on I/O error (bad file, out of range...)
  */
-bool fat16_fseek(FAT16_FILE* file, uint32_t addr);
+bool fat16_seek(FAT16_FILE* file, uint32_t addr);
 
 
 /**
  * Read bytes from file into memory
  * Returns false on I/O error (bad file, out of range...)
  */
-bool fat16_fread(FAT16_FILE* file, void* target, uint32_t len);
+bool fat16_read(FAT16_FILE* file, void* target, uint32_t len);
 
 
 /**
  * Write into file at a "seek" position.
  * "seek" cursor must be within (0..filesize)
  */
-bool fat16_fwrite(FAT16_FILE* file, void* source, uint32_t len);
+bool fat16_write(FAT16_FILE* file, void* source, uint32_t len);
 
 
 /**
@@ -204,6 +204,15 @@ bool fat16_rmfile(FAT16_FILE* file);
  */
 bool fat16_rmdir(FAT16_FILE* file);
 
+
+/**
+ * Delete a file or directory, regardless of type.
+ * Directories are deleted recursively.
+ */
+bool fat16_delete(FAT16_FILE* file);
+
+
+
 // --------- NAVIGATION ------------
 
 
@@ -234,7 +243,7 @@ void fat16_first(FAT16_FILE* file);
 /**
  * Find a file with given "display name" in this directory.
  * If file is found, "dir" will contain it's handle.
- * Either way, "dir" gets modified and you may need to rewind it afterwards.
+ * If file is NOT found, the handle points to the last entry of the directory.
  */
 bool fat16_find(FAT16_FILE* dir, const char* name);
 
@@ -242,7 +251,7 @@ bool fat16_find(FAT16_FILE* dir, const char* name);
 // -------- FILE INSPECTION -----------
 
 /** Check if file is a valid entry, or long-name/label/deleted */
-bool fat16_is_file_valid(const FAT16_FILE* file);
+bool fat16_is_regular(const FAT16_FILE* file);
 
 
 /**
