@@ -57,6 +57,20 @@ bool find_empty_file_slot(FAT16_FILE* file);
 
 // =========== INTERNAL FUNCTION IMPLEMENTATIONS =========
 
+
+uint16_t read16(const BLOCKDEV* dev)
+{
+	uint16_t a;
+	dev->load(&a, 2);
+	return a;
+}
+
+
+void write16(const BLOCKDEV* dev, const uint16_t val)
+{
+	dev->store(&val, 2);
+}
+
 /** Find absolute address of first boot sector. Returns 0 on failure. */
 uint32_t find_bs(const BLOCKDEV* dev)
 {
@@ -139,14 +153,14 @@ void read_bs(const BLOCKDEV* dev, Fat16BootSector* info, const uint32_t addr)
 void write_fat(const FAT16* fat, const uint16_t cluster, const uint16_t value)
 {
 	fat->dev->seek(fat->fat_addr + (cluster * 2));
-	fat->dev->write16(value);
+	write16(fat->dev, value);
 }
 
 
 uint16_t read_fat(const FAT16* fat, const uint16_t cluster)
 {
 	fat->dev->seek(fat->fat_addr + (cluster * 2));
-	return fat->dev->read16();
+	return read16(fat->dev);
 }
 
 
@@ -418,11 +432,11 @@ void write_file_header(FAT16_FILE* file, const char* fname_raw, const uint8_t at
 	}
 
 	// addr of the first file cluster
-	dev->write16(clu_start);
+	write16(dev, clu_start);
 
 	// file size (uint32_t)
-	dev->write16(0);
-	dev->write16(0);
+	write16(dev, 0);
+	write16(dev, 0);
 
 	// reopen file - load & parse the information just written
 	open_file(file->fat, file, file->clu, file->num);

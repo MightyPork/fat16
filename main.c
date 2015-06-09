@@ -45,11 +45,6 @@ void test_write(const uint8_t b)
 	fwrite(&b, 1, 1, testf);
 }
 
-void test_write16(const uint16_t b)
-{
-	fwrite(&b, 2, 1, testf);
-}
-
 uint8_t test_read()
 {
 	uint8_t a;
@@ -57,20 +52,10 @@ uint8_t test_read()
 	return a;
 }
 
-uint16_t test_read16()
-{
-	uint16_t a;
-	fread(&a, 2, 1, testf);
-	return a;
-}
-
 void test_open()
 {
 	test.read = &test_read;
 	test.write = &test_write;
-
-	test.read16 = &test_read16;
-	test.write16 = &test_write16;
 
 	test.load = &test_load;
 	test.store = &test_store;

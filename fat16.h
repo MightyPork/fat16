@@ -9,12 +9,8 @@ typedef struct
 	void (*store)(const void* src, const uint16_t len);
 	// Sequential byte write
 	void (*write)(const uint8_t b);
-	// Sequential 2-byte write
-	void (*write16)(const uint16_t b);
 	// Sequential byte read
 	uint8_t (*read)(void);
-	// Sequential 2-byte read
-	uint16_t (*read16)(void);
 	// Absolute seek
 	void (*seek)(const uint32_t);
 	// Relative seek
