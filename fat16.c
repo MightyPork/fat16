@@ -43,7 +43,7 @@ bool free_cluster_chain(const FAT16* fat, uint16_t clu);
  * Check if there is already a file of given RAW name
  * Raw name - name as found on disk, not "display name".
  */
-bool dir_find_file_raw(FAT16_FILE* dir, char* fname);
+bool dir_find_file_raw(FAT16_FILE* dir, const char* fname);
 
 /** Write a value into FAT */
 void write_fat(const FAT16* fat, const uint16_t cluster, const uint16_t value);
@@ -274,7 +274,7 @@ bool free_cluster_chain(const FAT16* fat, uint16_t clu)
  * Check if there is already a file of given RAW name
  * Raw name - name as found on disk, not "display name".
  */
-bool dir_find_file_raw(FAT16_FILE* dir, char* fname)
+bool dir_find_file_raw(FAT16_FILE* dir, const char* fname)
 {
 	// rewind
 	fat16_first(dir);
