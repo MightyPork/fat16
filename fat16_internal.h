@@ -1,5 +1,8 @@
 #pragma once
 
+#include <stdint.h>
+#include <stdbool.h>
+
 // Internal types and stuff that is needed in the header for declarations,
 // but is not a part of the public API.
 

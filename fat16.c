@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -1122,7 +1121,6 @@ bool fat16_delete(FAT16_FILE* file)
 	{
 		case FT_DELETED:
 		case FT_NONE:
-			printf("NONE OR DEL\n");
 			return true; // "deleted successfully"
 
 		case FT_SUBDIR:; // semicolon needed to allow declaration after "case"
