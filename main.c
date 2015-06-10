@@ -81,26 +81,26 @@ int main()
 
 	// Initialize the FS
 	FAT16 fat;
-	fat16_init(&test, &fat);
+	ff_init(&test, &fat);
 
-	FAT16_FILE file;
-	fat16_root(&fat, &file);
+	FFILE file;
+	ff_root(&fat, &file);
 
 	char str[12];
 
-	printf("Disk label: %s\n", fat16_disk_label(&fat, str));
+	printf("Disk label: %s\n", ff_disk_label(&fat, str));
 
 	do
 	{
-		if (!fat16_is_regular(&file))
+		if (!ff_is_regular(&file))
 			continue;
 
 		printf("File name: %s, %c, %d B, @ 0x%x\n",
-			   fat16_dispname(&file, str),
+			   ff_dispname(&file, str),
 			   file.type, file.size, file.clu_start);
 
 	}
-	while (fat16_next(&file));
+	while (ff_next(&file));
 
 //	fat16_root(&fat, &file);
 
